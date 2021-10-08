@@ -341,6 +341,7 @@ def SPV_INTEL_subgroups                         : StrEnumAttrCase<"SPV_INTEL_sub
 
 def SPV_NV_compute_shader_derivatives    : StrEnumAttrCase<"SPV_NV_compute_shader_derivatives">;
 def SPV_NV_cooperative_matrix            : StrEnumAttrCase<"SPV_NV_cooperative_matrix">;
+def SPV_VSI_cooperative_tensor           : StrEnumAttrCase<"SPV_VSI_cooperative_tensor">;
 def SPV_NV_fragment_shader_barycentric   : StrEnumAttrCase<"SPV_NV_fragment_shader_barycentric">;
 def SPV_NV_geometry_shader_passthrough   : StrEnumAttrCase<"SPV_NV_geometry_shader_passthrough">;
 def SPV_NV_mesh_shader                   : StrEnumAttrCase<"SPV_NV_mesh_shader">;
@@ -374,7 +375,7 @@ def SPV_ExtensionAttr :
       SPV_GOOGLE_decorate_string, SPV_GOOGLE_hlsl_functionality1, SPV_GOOGLE_user_type,
       SPV_INTEL_device_side_avc_motion_estimation, SPV_INTEL_media_block_io,
       SPV_INTEL_shader_integer_functions2, SPV_INTEL_subgroups,
-      SPV_NV_compute_shader_derivatives, SPV_NV_cooperative_matrix,
+      SPV_NV_compute_shader_derivatives, SPV_NV_cooperative_matrix, SPV_VSI_cooperative_tensor,
       SPV_NV_fragment_shader_barycentric, SPV_NV_geometry_shader_passthrough,
       SPV_NV_mesh_shader, SPV_NV_ray_tracing, SPV_NV_sample_mask_override_coverage,
       SPV_NV_shader_image_footprint, SPV_NV_shader_sm_builtins,
@@ -865,6 +866,12 @@ def SPV_C_CooperativeMatrixNV                       : I32EnumAttrCase<"Cooperati
     Extension<[SPV_NV_cooperative_matrix]>
   ];
 }
+def SPV_C_CooperativeTensorVSI                      : I32EnumAttrCase<"CooperativeTensorVSI", 6115> {
+  list<I32EnumAttrCase> implies = [SPV_C_Shader];
+  list<Availability> availability = [
+    Extension<[SPV_VSI_cooperative_tensor]>
+  ];
+}
 def SPV_C_FragmentShaderSampleInterlockEXT          : I32EnumAttrCase<"FragmentShaderSampleInterlockEXT", 5363> {
   list<I32EnumAttrCase> implies = [SPV_C_Shader];
   list<Availability> availability = [
@@ -1055,7 +1062,7 @@ def SPV_CapabilityAttr :
       SPV_C_FragmentFullyCoveredEXT, SPV_C_MeshShadingNV, SPV_C_FragmentDensityEXT,
       SPV_C_ShaderNonUniform, SPV_C_RuntimeDescriptorArray,
       SPV_C_StorageTexelBufferArrayDynamicIndexing, SPV_C_RayTracingNV,
-      SPV_C_PhysicalStorageBufferAddresses, SPV_C_CooperativeMatrixNV,
+      SPV_C_PhysicalStorageBufferAddresses, SPV_C_CooperativeMatrixNV, SPV_C_CooperativeTensorVSI,
       SPV_C_FragmentShaderSampleInterlockEXT,
       SPV_C_FragmentShaderShadingRateInterlockEXT, SPV_C_ShaderSMBuiltinsNV,
       SPV_C_FragmentShaderPixelInterlockEXT, SPV_C_DemoteToHelperInvocationEXT,
@@ -3112,6 +3119,8 @@ def SPV_IsRTArrayType : CPred<"$_self.isa<::mlir::spirv::RuntimeArrayType>()">;
 def SPV_IsSampledImageType : CPred<"$_self.isa<::mlir::spirv::SampledImageType>()">;
 def SPV_IsStructType : CPred<"$_self.isa<::mlir::spirv::StructType>()">;
 
+def SPV_IsCooperativeTensorType :
+  CPred<"$_self.isa<::mlir::spirv::CooperativeTensorVSIType>()">;
 
 // See https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#_types
 // for the definition of the following types and type categories.
@@ -3145,16 +3154,21 @@ def SPV_AnyStruct : DialectType<SPIRV_Dialect, SPV_IsStructType,
 def SPV_AnySampledImage : DialectType<SPIRV_Dialect, SPV_IsSampledImageType,
                                 "any SPIR-V sampled image type">;
 
+def SPV_AnyCooperativeTensor : DialectType<SPIRV_Dialect,
+                               SPV_IsCooperativeTensorType,
+                               "any SPIR-V cooperative tensor type">;
+
 def SPV_Numerical : AnyTypeOf<[SPV_Integer, SPV_Float]>;
 def SPV_Scalar : AnyTypeOf<[SPV_Numerical, SPV_Bool]>;
 def SPV_Aggregate : AnyTypeOf<[SPV_AnyArray, SPV_AnyRTArray, SPV_AnyStruct]>;
 def SPV_Composite :
     AnyTypeOf<[SPV_Vector, SPV_AnyArray, SPV_AnyRTArray, SPV_AnyStruct,
-               SPV_AnyCooperativeMatrix, SPV_AnyMatrix]>;
+               SPV_AnyCooperativeMatrix, SPV_AnyCooperativeTensor, SPV_AnyMatrix]>;
 def SPV_Type : AnyTypeOf<[
     SPV_Void, SPV_Bool, SPV_Integer, SPV_Float, SPV_Vector,
     SPV_AnyPtr, SPV_AnyArray, SPV_AnyRTArray, SPV_AnyStruct,
-    SPV_AnyCooperativeMatrix, SPV_AnyMatrix, SPV_AnySampledImage
+    SPV_AnyCooperativeMatrix, SPV_AnyMatrix, SPV_AnySampledImage,
+    SPV_AnyCooperativeTensor
   ]>;
 
 def SPV_SignedInt : SignedIntOfWidths<[8, 16, 32, 64]>;
@@ -3165,12 +3179,21 @@ class SPV_CoopMatrixOfType<list<Type> allowedTypes> :
     "$_self.cast<::mlir::spirv::CooperativeMatrixNVType>().getElementType()",
     "Cooperative Matrix">;
 
+class SPV_CoopTensorOfType<list<Type> allowedTypes> :
+  ContainerType<AnyTypeOf<allowedTypes>, SPV_IsCooperativeTensorType,
+    "$_self.cast<::mlir::spirv::CooperativeTensorVSIType>().getElementType()",
+    "Cooperative Tensor">;
+
 class SPV_ScalarOrVectorOf<Type type> :
     AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>]>;
 
 class SPV_ScalarOrVectorOrCoopMatrixOf<Type type> :
     AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>,
                SPV_CoopMatrixOfType<[type]>]>;
+
+class SPV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<Type type> :
+    AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>,
+               SPV_CoopMatrixOfType<[type]>, SPV_CoopTensorOfType<[type]>]>;
 
 def SPV_ScalarOrVector : AnyTypeOf<[SPV_Scalar, SPV_Vector]>;
 def SPV_ScalarOrVectorOrPtr : AnyTypeOf<[SPV_ScalarOrVector, SPV_AnyPtr]>;
@@ -3397,6 +3420,14 @@ def SPV_OC_OpCooperativeMatrixMulAddNV : I32EnumAttrCase<"OpCooperativeMatrixMul
 def SPV_OC_OpCooperativeMatrixLengthNV : I32EnumAttrCase<"OpCooperativeMatrixLengthNV", 5362>;
 def SPV_OC_OpSubgroupBlockReadINTEL    : I32EnumAttrCase<"OpSubgroupBlockReadINTEL", 5575>;
 def SPV_OC_OpSubgroupBlockWriteINTEL   : I32EnumAttrCase<"OpSubgroupBlockWriteINTEL", 5576>;
+def SPV_OC_OpTypeCooperativeTensorVSI      : I32EnumAttrCase<"OpTypeCooperativeTensorVSI", 6093>;
+def SPV_OC_OpCooperativeTensorLoadVSI      : I32EnumAttrCase<"OpCooperativeTensorLoadVSI", 6094>;
+def SPV_OC_OpCooperativeTensorStoreVSI     : I32EnumAttrCase<"OpCooperativeTensorStoreVSI", 6095>;
+def SPV_OC_OpCooperativeTensorMatMulAddVSI : I32EnumAttrCase<"OpCooperativeTensorMatMulAddVSI", 6096>;
+def SPV_OC_OpCooperativeTensorLengthVSI    : I32EnumAttrCase<"OpCooperativeTensorLengthVSI", 6097>;
+def SPV_OC_OpCooperativeTensorConv2DVSI    : I32EnumAttrCase<"OpCooperativeTensorConv2DVSI", 6098>;
+def SPV_OC_OpCooperativeTensorTransposeVSI : I32EnumAttrCase<"OpCooperativeTensorTransposeVSI", 6099>;
+def SPV_OC_OpCooperativeTensorMaxPool2DVSI : I32EnumAttrCase<"OpCooperativeTensorMaxPool2DVSI", 6100>;
 
 def SPV_OpcodeAttr :
     SPV_I32EnumAttr<"Opcode", "valid SPIR-V instructions", [
@@ -3459,7 +3490,12 @@ def SPV_OpcodeAttr :
       SPV_OC_OpSubgroupBallotKHR, SPV_OC_OpTypeCooperativeMatrixNV,
       SPV_OC_OpCooperativeMatrixLoadNV, SPV_OC_OpCooperativeMatrixStoreNV,
       SPV_OC_OpCooperativeMatrixMulAddNV, SPV_OC_OpCooperativeMatrixLengthNV,
-      SPV_OC_OpSubgroupBlockReadINTEL, SPV_OC_OpSubgroupBlockWriteINTEL
+      SPV_OC_OpSubgroupBlockReadINTEL, SPV_OC_OpSubgroupBlockWriteINTEL,
+
+      SPV_OC_OpTypeCooperativeTensorVSI, SPV_OC_OpCooperativeTensorLoadVSI,
+      SPV_OC_OpCooperativeTensorStoreVSI, SPV_OC_OpCooperativeTensorLengthVSI,
+      SPV_OC_OpCooperativeTensorMatMulAddVSI, SPV_OC_OpCooperativeTensorConv2DVSI,
+      SPV_OC_OpCooperativeTensorTransposeVSI, SPV_OC_OpCooperativeTensorMaxPool2DVSI
     ]>;
 
 // End opcode section. Generated from SPIR-V spec; DO NOT MODIFY!

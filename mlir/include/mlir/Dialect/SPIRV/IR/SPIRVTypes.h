@@ -28,6 +28,7 @@ namespace spirv {
 namespace detail {
 struct ArrayTypeStorage;
 struct CooperativeMatrixTypeStorage;
+struct CooperativeTensorTypeStorage;
 struct ImageTypeStorage;
 struct MatrixTypeStorage;
 struct PointerTypeStorage;
@@ -417,6 +418,25 @@ public:
                      Optional<StorageClass> storage = llvm::None);
   void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
                        Optional<StorageClass> storage = llvm::None);
+};
+
+// SPIR-V cooperative tensor type
+class CooperativeTensorVSIType
+    : public Type::TypeBase<CooperativeTensorVSIType, CompositeType,
+                            detail::CooperativeTensorTypeStorage> {
+public:
+  using Base::Base;
+
+  static CooperativeTensorVSIType get(Type elementType,
+                                     ArrayRef<int64_t> shape);
+  Type getElementType() const;
+
+  void getExtensions(SPIRVType::ExtensionArrayRefVector &extensions,
+                     Optional<StorageClass> storage = llvm::None);
+  void getCapabilities(SPIRVType::CapabilityArrayRefVector &capabilities,
+                       Optional<StorageClass> storage = llvm::None);
+
+  ArrayRef<int64_t> getShape() const;
 };
 
 // SPIR-V matrix type
