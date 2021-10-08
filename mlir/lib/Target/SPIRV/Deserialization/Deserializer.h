@@ -270,6 +270,8 @@ private:
 
   LogicalResult processCooperativeMatrixType(ArrayRef<uint32_t> operands);
 
+  LogicalResult processCooperativeTensorType(ArrayRef<uint32_t> operands);
+
   LogicalResult processFunctionType(ArrayRef<uint32_t> operands);
 
   LogicalResult processImageType(ArrayRef<uint32_t> operands);

@@ -92,7 +92,7 @@ bool CompositeType::classof(Type type) {
     return isValid(vectorType);
   return type
       .isa<spirv::ArrayType, spirv::CooperativeMatrixNVType, spirv::MatrixType,
-           spirv::RuntimeArrayType, spirv::StructType>();
+           spirv::RuntimeArrayType, spirv::StructType, spirv::CooperativeTensorVSIType>();
 }
 
 bool CompositeType::isValid(VectorType type) {
@@ -111,7 +111,7 @@ bool CompositeType::isValid(VectorType type) {
 
 Type CompositeType::getElementType(unsigned index) const {
   return TypeSwitch<Type, Type>(*this)
-      .Case<ArrayType, CooperativeMatrixNVType, RuntimeArrayType, VectorType>(
+      .Case<ArrayType, CooperativeMatrixNVType, CooperativeTensorVSIType, RuntimeArrayType, VectorType>(
           [](auto type) { return type.getElementType(); })
       .Case<MatrixType>([](MatrixType type) { return type.getColumnType(); })
       .Case<StructType>(
@@ -133,6 +133,10 @@ unsigned CompositeType::getNumElements() const {
     llvm_unreachable(
         "invalid to query number of elements of spirv::CooperativeMatrix type");
   }
+  if (isa<CooperativeTensorVSIType>()) {
+    llvm_unreachable(
+        "invalid to query number of elements of spirv::CooperativeTensor type");
+  }
   if (isa<RuntimeArrayType>()) {
     llvm_unreachable(
         "invalid to query number of elements of spirv::RuntimeArray type");
@@ -141,14 +145,14 @@ unsigned CompositeType::getNumElements() const {
 }
 
 bool CompositeType::hasCompileTimeKnownNumElements() const {
-  return !isa<CooperativeMatrixNVType, RuntimeArrayType>();
+  return !isa<CooperativeMatrixNVType, RuntimeArrayType, CooperativeTensorVSIType>();
 }
 
 void CompositeType::getExtensions(
     SPIRVType::ExtensionArrayRefVector &extensions,
     Optional<StorageClass> storage) {
   TypeSwitch<Type>(*this)
-      .Case<ArrayType, CooperativeMatrixNVType, MatrixType, RuntimeArrayType,
+      .Case<ArrayType, CooperativeMatrixNVType, CooperativeTensorVSIType, MatrixType, RuntimeArrayType,
             StructType>(
           [&](auto type) { type.getExtensions(extensions, storage); })
       .Case<VectorType>([&](VectorType type) {
@@ -162,7 +166,7 @@ void CompositeType::getCapabilities(
     SPIRVType::CapabilityArrayRefVector &capabilities,
     Optional<StorageClass> storage) {
   TypeSwitch<Type>(*this)
-      .Case<ArrayType, CooperativeMatrixNVType, MatrixType, RuntimeArrayType,
+      .Case<ArrayType, CooperativeMatrixNVType, CooperativeTensorVSIType, MatrixType, RuntimeArrayType,
             StructType>(
           [&](auto type) { type.getCapabilities(capabilities, storage); })
       .Case<VectorType>([&](VectorType type) {
@@ -252,6 +256,67 @@ void CooperativeMatrixNVType::getCapabilities(
     Optional<StorageClass> storage) {
   getElementType().cast<SPIRVType>().getCapabilities(capabilities, storage);
   static const Capability caps[] = {Capability::CooperativeMatrixNV};
+  ArrayRef<Capability> ref(caps, llvm::array_lengthof(caps));
+  capabilities.push_back(ref);
+}
+
+//===----------------------------------------------------------------------===//
+// CooperativeTensorType
+//===----------------------------------------------------------------------===//
+
+struct spirv::detail::CooperativeTensorTypeStorage : public TypeStorage {
+  using KeyTy = std::tuple<Type, ArrayRef<int64_t>>;
+
+  static CooperativeTensorTypeStorage *
+  construct(TypeStorageAllocator &allocator, const KeyTy &key) {
+    auto elementType = std::get<0>(key);
+    auto shape = allocator.copyInto(std::get<1>(key));
+    return new (allocator.allocate<CooperativeTensorTypeStorage>())
+        CooperativeTensorTypeStorage(elementType, shape);
+  }
+
+  bool operator==(const KeyTy &key) const {
+    if (!(shape == std::get<1>(key)))
+      return false;
+    if (!(elementType == std::get<0>(key)))
+      return false;
+    return true;
+  }
+
+  CooperativeTensorTypeStorage(Type elementType, ArrayRef<int64_t> shape)
+      : elementType(elementType), shape(shape) {}
+
+  Type elementType;
+  ArrayRef<int64_t> shape;
+};
+
+CooperativeTensorVSIType CooperativeTensorVSIType::get(Type elementType,
+                                                     ArrayRef<int64_t> shape) {
+  return Base::get(elementType.getContext(), elementType, shape);
+}
+
+Type CooperativeTensorVSIType::getElementType() const {
+  return getImpl()->elementType;
+}
+
+ArrayRef<int64_t> CooperativeTensorVSIType::getShape() const {
+  return getImpl()->shape;
+}
+
+void CooperativeTensorVSIType::getExtensions(
+    SPIRVType::ExtensionArrayRefVector &extensions,
+    Optional<StorageClass> storage) {
+  getElementType().cast<SPIRVType>().getExtensions(extensions, storage);
+  static const Extension exts[] = {Extension::SPV_VSI_cooperative_tensor};
+  ArrayRef<Extension> ref(exts, llvm::array_lengthof(exts));
+  extensions.push_back(ref);
+}
+
+void CooperativeTensorVSIType::getCapabilities(
+    SPIRVType::CapabilityArrayRefVector &capabilities,
+    Optional<StorageClass> storage) {
+  getElementType().cast<SPIRVType>().getCapabilities(capabilities, storage);
+  static const Capability caps[] = {Capability::CooperativeTensorVSI};
   ArrayRef<Capability> ref(caps, llvm::array_lengthof(caps));
   capabilities.push_back(ref);
 }
@@ -1161,5 +1226,5 @@ void MatrixType::getCapabilities(
 
 void SPIRVDialect::registerTypes() {
   addTypes<ArrayType, CooperativeMatrixNVType, ImageType, MatrixType,
-           PointerType, RuntimeArrayType, SampledImageType, StructType>();
+           PointerType, RuntimeArrayType, SampledImageType, StructType, CooperativeTensorVSIType>();
 }

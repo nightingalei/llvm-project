@@ -388,6 +388,11 @@ static LogicalResult verifyCastOp(Operation *op,
     operandType = coopMatrixType.getElementType();
     resultType =
         resultType.cast<spirv::CooperativeMatrixNVType>().getElementType();
+  } else if (auto coopTensorType =
+          operandType.dyn_cast<spirv::CooperativeTensorVSIType>()) {
+    operandType = coopTensorType.getElementType();
+    resultType =
+        resultType.cast<spirv::CooperativeTensorVSIType>().getElementType();
   }
 
   auto operandTypeBitWidth = operandType.getIntOrFloatBitWidth();
@@ -1398,6 +1403,11 @@ static LogicalResult verify(spirv::CompositeConstructOp compositeConstructOp) {
   SmallVector<Value, 4> constituents(compositeConstructOp.constituents());
 
   if (cType.isa<spirv::CooperativeMatrixNVType>()) {
+    if (constituents.size() != 1)
+      return compositeConstructOp.emitError(
+                 "has incorrect number of operands: expected ")
+             << "1, but provided " << constituents.size();
+  } else if (cType.isa<spirv::CooperativeTensorVSIType>()) {
     if (constituents.size() != 1)
       return compositeConstructOp.emitError(
                  "has incorrect number of operands: expected ")
@@ -3918,6 +3928,143 @@ static void print(spirv::PtrAccessChainOp op, OpAsmPrinter &printer) {
 
 static LogicalResult verify(spirv::PtrAccessChainOp accessChainOp) {
   return verifyAccessChain(accessChainOp, accessChainOp.indices());
+}
+
+//===----------------------------------------------------------------------===//
+// spv.CooperativeTensorLoadVSI
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseCooperativeTensorLoadVSIOp(OpAsmParser &parser,
+                                                  OperationState &state) {
+  SmallVector<OpAsmParser::OperandType, 4> operandInfo;
+  SmallVector<int64_t, 1> stridesLen = {4};
+  Type offsetType = parser.getBuilder().getIntegerType(32);
+  Type strideType = VectorType::get(stridesLen, parser.getBuilder().getIntegerType(32));
+  Type hwcLayoutType = parser.getBuilder().getIntegerType(1);
+  Type ptrType;
+  Type elementType;
+  if (parser.parseOperandList(operandInfo, 4) ||
+      parseMemoryAccessAttributes(parser, state) || parser.parseColon() ||
+      parser.parseType(ptrType) || parser.parseKeywordType("as", elementType)) {
+    return failure();
+  }
+  if (parser.resolveOperands(operandInfo,
+                             {ptrType, offsetType, strideType, hwcLayoutType},
+                             parser.getNameLoc(), state.operands)) {
+    return failure();
+  }
+
+  state.addTypes(elementType);
+  return success();
+}
+
+static void print(spirv::CooperativeTensorLoadVSIOp M, OpAsmPrinter &printer) {
+  printer << " " << M.pointer() << ", " << M.offset() << ", " << M.strides()
+          << ", " << M.hwclayout();
+  // Print optional memory access attribute.
+  if (auto memAccess = M.memory_access())
+    printer << " [\"" << stringifyMemoryAccess(*memAccess) << "\"]";
+  printer << " : " << M.pointer().getType() << " as " << M.getType();
+}
+
+static LogicalResult verifyPointerAndCoopTensorType(Operation *op, Type pointer,
+                                                    Type coopTensor) {
+  Type pointeeType = pointer.cast<spirv::PointerType>().getPointeeType();
+  if (!pointeeType.isa<spirv::ScalarType>() && !pointeeType.isa<VectorType>())
+    return op->emitError(
+               "Pointer must point to a scalar or vector type but provided ")
+           << pointeeType;
+  spirv::StorageClass storage =
+      pointer.cast<spirv::PointerType>().getStorageClass();
+  if (storage != spirv::StorageClass::Workgroup &&
+      storage != spirv::StorageClass::StorageBuffer &&
+      storage != spirv::StorageClass::PhysicalStorageBuffer)
+    return op->emitError(
+               "Pointer storage class must be Workgroup, StorageBuffer or "
+               "PhysicalStorageBufferEXT but provided ")
+           << stringifyStorageClass(storage);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// spv.CooperativeTensorStoreVSI
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseCooperativeTensorStoreVSIOp(OpAsmParser &parser,
+                                                   OperationState &state) {
+  SmallVector<OpAsmParser::OperandType, 5> operandInfo;
+  SmallVector<int64_t, 1> stridesLen = {4};
+  Type offsetType = parser.getBuilder().getIntegerType(32);
+  Type strideType = VectorType::get(stridesLen, parser.getBuilder().getIntegerType(32));
+  Type hwcLayoutType = parser.getBuilder().getIntegerType(1);
+  Type ptrType;
+  Type elementType;
+  if (parser.parseOperandList(operandInfo, 5) ||
+      parseMemoryAccessAttributes(parser, state) || parser.parseColon() ||
+      parser.parseType(ptrType) || parser.parseComma() ||
+      parser.parseType(elementType)) {
+    return failure();
+  }
+  if (parser.resolveOperands(
+          operandInfo, {ptrType, elementType, offsetType, strideType, hwcLayoutType},
+          parser.getNameLoc(), state.operands)) {
+    return failure();
+  }
+
+  return success();
+}
+
+static void print(spirv::CooperativeTensorStoreVSIOp M,
+                  OpAsmPrinter &printer) {
+  printer << " " << M.pointer() << ", " << M.object() << ", "
+          << M.offset() << ", " << M.strides() << ", " << M.hwclayout();
+  // Print optional memory access attribute.
+  if (auto memAccess = M.memory_access())
+    printer << " [\"" << stringifyMemoryAccess(*memAccess) << "\"]";
+  printer << " : " << M.pointer().getType() << ", "
+          << M.getOperand(1).getType();
+}
+
+//===----------------------------------------------------------------------===//
+// spv.CooperativeTensorMatMulAddVSI
+//===----------------------------------------------------------------------===//
+
+static LogicalResult
+verifyCoopTensorMatMulAdd(spirv::CooperativeTensorMatMulAddVSIOp op) {
+  if (op.c().getType() != op.result().getType())
+    return op.emitOpError("result and third operand must have the same type");
+  auto typeA = op.a().getType().cast<spirv::CooperativeTensorVSIType>();
+  auto typeB = op.b().getType().cast<spirv::CooperativeTensorVSIType>();
+  auto typeC = op.c().getType().cast<spirv::CooperativeTensorVSIType>();
+  auto typeR = op.result().getType().cast<spirv::CooperativeTensorVSIType>();
+  //if (typeA.getRows() != typeR.getRows() ||
+  //    typeA.getColumns() != typeB.getRows() ||
+  //    typeB.getColumns() != typeR.getColumns())
+  //  return op.emitOpError("matrix size must match");
+  if (typeA.getElementType() != typeB.getElementType() ||
+      typeR.getElementType() != typeC.getElementType())
+    return op.emitOpError("matrix element type must match");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// spv.CooperativeTensorConv2DVSI
+//===----------------------------------------------------------------------===//
+
+static LogicalResult
+verifyCoopTensorConv2D(spirv::CooperativeTensorConv2DVSIOp op) {
+  auto typeInput = op.input().getType().cast<spirv::CooperativeTensorVSIType>();
+  auto typeWeight = op.weight().getType().cast<spirv::CooperativeTensorVSIType>();
+  //auto typeBias = op.bias().getType().cast<spirv::CooperativeTensorVSIType>();
+  //auto typeStrides = op.strides().getType().cast<VectorType>();
+  //auto typeR = op.result().getType().cast<spirv::CooperativeTensorVSIType>();
+  //if (typeA.getRows() != typeR.getRows() ||
+  //    typeA.getColumns() != typeB.getRows() ||
+  //    typeB.getColumns() != typeR.getColumns())
+  //  return op.emitOpError("matrix size must match");
+  if (typeInput.getElementType() != typeWeight.getElementType())
+    return op.emitOpError("Input and weight element type must match");
+  return success();
 }
 
 // TableGen'erated operation interfaces for querying versions, extensions, and
