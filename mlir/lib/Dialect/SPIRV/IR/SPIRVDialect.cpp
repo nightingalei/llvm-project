@@ -348,6 +348,31 @@ static Type parseCooperativeMatrixType(SPIRVDialect const &dialect,
   return CooperativeMatrixNVType::get(elementTy, scope, dims[0], dims[1]);
 }
 
+// cooperative-tensor-type ::= `!spv.cooptensor` `<` dimenson-list 'x' element-type `>`
+static Type parseCooperativeTensorType(SPIRVDialect const &dialect,
+                                       DialectAsmParser &parser) {
+  if (parser.parseLess())
+    return Type();
+
+  SmallVector<int64_t, 0> shape;
+  llvm::SMLoc countLoc = parser.getCurrentLocation();
+  if (parser.parseDimensionList(shape, /*allowDynamic=*/false))
+    return Type();
+
+  if (shape.size() < 1) {
+    parser.emitError(countLoc, "expected shape");
+    return Type();
+  }
+
+  auto elementTy = parseAndVerifyType(dialect, parser);
+  if (!elementTy)
+    return Type();
+
+  if (parser.parseGreater())
+    return Type();
+  return CooperativeTensorVSIType::get(elementTy, shape);
+}
+
 // TODO: Reorder methods to be utilities first and parse*Type
 // methods in alphabetical order
 //
@@ -760,6 +785,8 @@ Type SPIRVDialect::parseType(DialectAsmParser &parser) const {
     return parseStructType(*this, parser);
   if (keyword == "matrix")
     return parseMatrixType(*this, parser);
+  if (keyword == "cooptensor")
+    return parseCooperativeTensorType(*this, parser);
   parser.emitError(parser.getNameLoc(), "unknown SPIR-V type: ") << keyword;
   return Type();
 }
@@ -854,6 +881,12 @@ static void print(CooperativeMatrixNVType type, DialectAsmPrinter &os) {
   os << ">";
 }
 
+static void print(CooperativeTensorVSIType type, DialectAsmPrinter &os) {
+  os << "cooptensor<" << type.getShape()[0] << "x" << type.getShape()[1] << "x";
+  os << type.getElementType();
+  os << ">";
+}
+
 static void print(MatrixType type, DialectAsmPrinter &os) {
   os << "matrix<" << type.getNumColumns() << " x " << type.getColumnType();
   os << ">";
@@ -862,7 +895,7 @@ static void print(MatrixType type, DialectAsmPrinter &os) {
 void SPIRVDialect::printType(Type type, DialectAsmPrinter &os) const {
   TypeSwitch<Type>(type)
       .Case<ArrayType, CooperativeMatrixNVType, PointerType, RuntimeArrayType,
-            ImageType, SampledImageType, StructType, MatrixType>(
+            ImageType, SampledImageType, StructType, MatrixType, CooperativeTensorVSIType>(
           [&](auto type) { print(type, os); })
       .Default([](Type) { llvm_unreachable("unhandled SPIR-V type"); });
 }
