@@ -3190,6 +3190,10 @@ class SPV_ScalarOrVectorOrCoopMatrixOf<Type type> :
     AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>,
                SPV_CoopMatrixOfType<[type]>]>;
 
+class SPV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<Type type> :
+    AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>,
+               SPV_CoopMatrixOfType<[type]>, SPV_CoopTensorOfType<[type]>]>;
+
 def SPV_ScalarOrVector : AnyTypeOf<[SPV_Scalar, SPV_Vector]>;
 def SPV_ScalarOrVectorOrPtr : AnyTypeOf<[SPV_ScalarOrVector, SPV_AnyPtr]>;
 

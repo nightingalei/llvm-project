@@ -126,7 +126,7 @@ def SPV_CooperativeTensorLoadVSIOp : SPV_Op<"CooperativeTensorLoadVSI", []> {
     SPV_AnyPtr:$pointer,
     SPV_Integer:$offset,
     SPV_Integer:$stride,
-    SPV_Bool:$hwc_layout,
+    SPV_Bool:$hwclayout,
     OptionalAttr<SPV_MemoryAccessAttr>:$memory_access
   );
 
@@ -271,7 +271,7 @@ def SPV_CooperativeTensorStoreVSIOp : SPV_Op<"CooperativeTensorStoreVSI", []> {
     SPV_AnyCooperativeTensor:$object,
     SPV_Integer:$offset,
     SPV_Integer:$stride,
-    SPV_Bool:$hwc_layout,
+    SPV_Bool:$hwclayout,
     OptionalAttr<SPV_MemoryAccessAttr>:$memory_access
   );
 

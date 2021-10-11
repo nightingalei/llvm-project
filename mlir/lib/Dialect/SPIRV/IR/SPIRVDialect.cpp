@@ -882,7 +882,10 @@ static void print(CooperativeMatrixNVType type, DialectAsmPrinter &os) {
 }
 
 static void print(CooperativeTensorVSIType type, DialectAsmPrinter &os) {
-  os << "cooptensor<" << type.getShape()[0] << "x" << type.getShape()[1] << "x";
+  os << "cooptensor<";
+  for (auto dim : type.getShape()) {
+    os << dim << "x";
+  }
   os << type.getElementType();
   os << ">";
 }

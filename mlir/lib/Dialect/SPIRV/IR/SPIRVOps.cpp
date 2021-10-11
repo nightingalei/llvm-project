@@ -3953,7 +3953,8 @@ static ParseResult parseCooperativeTensorLoadVSIOp(OpAsmParser &parser,
 }
 
 static void print(spirv::CooperativeTensorLoadVSIOp M, OpAsmPrinter &printer) {
-  printer << M.pointer() << ", " << M.offset() << ", " << M.stride();
+  printer << " " << M.pointer() << ", " << M.offset() << ", " << M.stride()
+          << ", " << M.hwclayout();
   // Print optional memory access attribute.
   if (auto memAccess = M.memory_access())
     printer << " [\"" << stringifyMemoryAccess(*memAccess) << "\"]";
@@ -4006,15 +4007,15 @@ static ParseResult parseCooperativeTensorStoreVSIOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(spirv::CooperativeTensorStoreVSIOp coopTensor,
+static void print(spirv::CooperativeTensorStoreVSIOp M,
                   OpAsmPrinter &printer) {
-  printer << coopTensor.pointer() << ", " << coopTensor.object() << ", "
-          << coopTensor.offset() << ", " << coopTensor.stride();
+  printer << " " << M.pointer() << ", " << M.object() << ", "
+          << M.offset() << ", " << M.stride() << ", " << M.hwclayout();
   // Print optional memory access attribute.
-  if (auto memAccess = coopTensor.memory_access())
+  if (auto memAccess = M.memory_access())
     printer << " [\"" << stringifyMemoryAccess(*memAccess) << "\"]";
-  printer << " : " << coopTensor.pointer().getType() << ", "
-          << coopTensor.getOperand(1).getType();
+  printer << " : " << M.pointer().getType() << ", "
+          << M.getOperand(1).getType();
 }
 
 //===----------------------------------------------------------------------===//
