@@ -2,30 +2,30 @@
 
 spv.module Logical GLSL450 requires #spv.vce<v1.0, [CooperativeTensorVSI], [SPV_VSI_cooperative_tensor]> {
   // CHECK-LABEL: @cooperative_tensor_load
-  spv.func @cooperative_tensor_load(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %stride : i32, %b : i1) "None" {
+  spv.func @cooperative_tensor_load(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %strides : vector<4xi32>, %b : i1) "None" {
     // CHECK: {{%.*}} = spv.CooperativeTensorLoadVSI {{%.*}}, {{%.*}}, {{%.*}}, {{%.*}} : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
-    %0 = spv.CooperativeTensorLoadVSI %ptr, %offset, %stride, %b : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
+    %0 = spv.CooperativeTensorLoadVSI %ptr, %offset, %strides, %b : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
     spv.Return
   }
 
   // CHECK-LABEL: @cooperative_tensor_load_memaccess
-  spv.func @cooperative_tensor_load_memaccess(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %stride : i32, %b : i1) "None" {
+  spv.func @cooperative_tensor_load_memaccess(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %strides : vector<4xi32>, %b : i1) "None" {
     // CHECK: {{%.*}} = spv.CooperativeTensorLoadVSI {{%.*}}, {{%.*}}, {{%.*}}, {{%.*}} ["Volatile"] : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
-    %0 = spv.CooperativeTensorLoadVSI %ptr, %offset, %stride, %b ["Volatile"] : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
+    %0 = spv.CooperativeTensorLoadVSI %ptr, %offset, %strides, %b ["Volatile"] : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<3x3x128xi32>
     spv.Return
   }
 
   // CHECK-LABEL: @cooperative_tensor_store
-  spv.func @cooperative_tensor_store(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %stride : i32, %m : !spv.cooptensor<3x3x128xi32>, %b : i1) "None" {
+  spv.func @cooperative_tensor_store(%ptr : !spv.ptr<i32, StorageBuffer>, %offset: i32, %strides : vector<4xi32>, %m : !spv.cooptensor<3x3x128xi32>, %b : i1) "None" {
     // CHECK: spv.CooperativeTensorStoreVSI {{%.*}}, {{%.*}}, {{%.*}}, {{%.*}} : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
-    spv.CooperativeTensorStoreVSI %ptr, %m, %offset, %stride, %b : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
+    spv.CooperativeTensorStoreVSI %ptr, %m, %offset, %strides, %b : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
     spv.Return
   }
 
   // CHECK-LABEL: @cooperative_tensor_store_memaccess
-  spv.func @cooperative_tensor_store_memaccess(%ptr : !spv.ptr<i32, StorageBuffer>, %m : !spv.cooptensor<3x3x128xi32>, %offset: i32, %stride : i32, %b : i1) "None" {
+  spv.func @cooperative_tensor_store_memaccess(%ptr : !spv.ptr<i32, StorageBuffer>, %m : !spv.cooptensor<3x3x128xi32>, %offset: i32, %strides : vector<4xi32>, %b : i1) "None" {
     // CHECK: spv.CooperativeTensorStoreVSI {{%.*}}, {{%.*}}, {{%.*}}, {{%.*}} ["Volatile"] : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
-    spv.CooperativeTensorStoreVSI %ptr, %m, %offset, %stride, %b ["Volatile"] : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
+    spv.CooperativeTensorStoreVSI %ptr, %m, %offset, %strides, %b ["Volatile"] : !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<3x3x128xi32>
     spv.Return
   }
 
@@ -36,10 +36,17 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [CooperativeTensorVSI], [SPV_
     spv.ReturnValue %0 : i32
   }
 
-  // CHECK-LABEL: @cooperative_tensor_muladd
-  spv.func @cooperative_tensor_muladd(%a : !spv.cooptensor<8x16xi32>, %b : !spv.cooptensor<16x8xi32>, %c : !spv.cooptensor<8x8xi32>) "None" {
+  // CHECK-LABEL: @cooperative_tensor_matmuladd
+  spv.func @cooperative_tensor_matmuladd(%a : !spv.cooptensor<8x16xi32>, %b : !spv.cooptensor<16x8xi32>, %c : !spv.cooptensor<8x8xi32>) "None" {
     // CHECK: {{%.*}} = spv.CooperativeTensorMatMulAddVSI {{%.*}}, {{%.*}}, {{%.*}}  : !spv.cooptensor<8x16xi32>, !spv.cooptensor<16x8xi32> -> !spv.cooptensor<8x8xi32>
     %r = spv.CooperativeTensorMatMulAddVSI %a, %b, %c : !spv.cooptensor<8x16xi32>, !spv.cooptensor<16x8xi32> -> !spv.cooptensor<8x8xi32>
+    spv.Return
+  }
+
+  // CHECK-LABEL: @cooperative_tensor_conv2d
+  spv.func @cooperative_tensor_conv2d(%input : !spv.cooptensor<28x28x1xi32>, %weight : !spv.cooptensor<128x3x3x1xi32>, %bias : !spv.cooptensor<128xi32>, %strides : vector<2xi32>) "None" {
+    // CHECK: {{%.*}} = spv.CooperativeTensorConv2DVSI {{%.*}}, {{%.*}}, {{%.*}}, {{%.*}}  : !spv.cooptensor<28x28x1xi32>, !spv.cooptensor<128x3x3x1xi32>, !spv.cooptensor<128xi32>, vector<2xi32>  -> !spv.cooptensor<128x26x26xi32>
+    %r = spv.CooperativeTensorConv2DVSI %input, %weight, %bias, %strides : !spv.cooptensor<28x28x1xi32>, !spv.cooptensor<128x3x3x1xi32>, !spv.cooptensor<128xi32>, vector<2xi32> -> !spv.cooptensor<128x26x26xi32>
     spv.Return
   }
 

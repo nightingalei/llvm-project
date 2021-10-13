@@ -74,23 +74,6 @@ def SPV_CooperativeTensorLoadVSIOp : SPV_Op<"CooperativeTensorLoadVSI", []> {
     be Workgroup, StorageBuffer, or (if SPV_EXT_physical_storage_buffer is
     supported) PhysicalStorageBufferEXT.
 
-    Stride is the number of elements in the array in memory between the first
-    component of consecutive rows (or columns) in the result. It must be a
-    scalar integer type.
-
-    ColumnMajor indicates whether the values loaded from memory are arranged in
-    column-major or row-major order. It must be a boolean constant instruction,
-    with false indicating row major and true indicating column major.
-
-    Memory Access must be a Memory Access literal. If not present, it is the
-    same as specifying None.
-
-    If ColumnMajor is false, then elements (row,*) of the result are taken in
-    order from contiguous locations starting at Pointer[row*Stride]. If
-    ColumnMajor is true, then elements (*,col) of the result are taken in order
-    from contiguous locations starting from Pointer[col*Stride]. Any ArrayStride
-    decoration on Pointer is ignored.
-
     For a given dynamic instance of this instruction, all operands of this
     instruction must be the same for all invocations in a given scope instance
     (where the scope is the scope the cooperative tensor type was created with).
@@ -110,8 +93,8 @@ def SPV_CooperativeTensorLoadVSIOp : SPV_Op<"CooperativeTensorLoadVSI", []> {
     For example:
 
     ```
-    %0 = spv.CooperativeTensorLoadVSI %ptr, %stride, %colMajor
-         : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<i32, 16, 8>
+    %0 = spv.CooperativeTensorLoadVSI %ptr, %offset, %strides, %hwcLayout
+         : !spv.ptr<i32, StorageBuffer> as !spv.cooptensor<16x8xi32>
     ```
   }];
 
@@ -125,7 +108,7 @@ def SPV_CooperativeTensorLoadVSIOp : SPV_Op<"CooperativeTensorLoadVSI", []> {
   let arguments = (ins
     SPV_AnyPtr:$pointer,
     SPV_Integer:$offset,
-    SPV_Integer:$stride,
+    SPV_Vector:$strides,
     SPV_Bool:$hwclayout,
     OptionalAttr<SPV_MemoryAccessAttr>:$memory_access
   );
@@ -232,14 +215,6 @@ def SPV_CooperativeTensorStoreVSIOp : SPV_Op<"CooperativeTensorStoreVSI", []> {
     Object is the object to store. Its type must be an
     OpTypeCooperativeTensorVSI.
 
-    Stride is the number of elements in the array in memory between the first
-    component of consecutive rows (or columns) in the result. It must be a
-    scalar integer type.
-
-    ColumnMajor indicates whether the values stored to memory are arranged in
-    column-major or row-major order. It must be a boolean constant instruction,
-    with false indicating row major and true indicating column major.
-
     Memory Access must be a Memory Access literal. If not present, it is the
     same as specifying None.
 
@@ -255,7 +230,7 @@ def SPV_CooperativeTensorStoreVSIOp : SPV_Op<"CooperativeTensorStoreVSI", []> {
 
     ```
       spv.CooperativeTensorStoreVSI %arg0, %arg2, %arg1, %arg3 :
-        !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<i32, 16, 8>
+        !spv.ptr<i32, StorageBuffer>, !spv.cooptensor<16x8xi32>
     ```
   }];
 
@@ -270,7 +245,7 @@ def SPV_CooperativeTensorStoreVSIOp : SPV_Op<"CooperativeTensorStoreVSI", []> {
     SPV_AnyPtr:$pointer,
     SPV_AnyCooperativeTensor:$object,
     SPV_Integer:$offset,
-    SPV_Integer:$stride,
+    SPV_Vector:$strides,
     SPV_Bool:$hwclayout,
     OptionalAttr<SPV_MemoryAccessAttr>:$memory_access
   );
@@ -281,6 +256,55 @@ def SPV_CooperativeTensorStoreVSIOp : SPV_Op<"CooperativeTensorStoreVSI", []> {
     return verifyPointerAndCoopTensorType(*this, pointer().getType(),
                                           object().getType());
   }];
+}
+
+// -----
+
+def SPV_CooperativeTensorConv2DVSIOp : SPV_Op<"CooperativeTensorConv2DVSI",
+  [NoSideEffect]> {
+  let summary = "See extension SPV_VSI_cooperative_tensor";
+
+  let description = [{
+    ``` {.ebnf}
+    cooperative-tensormatmuladd-op ::= ssa-id `=` `spv.CooperativeTensorConv2DVSI`
+                              ssa-use `,` ssa-use `,` ssa-use `,` ssa-use ` : `
+                              input-cooperative-tensor-type,
+                              weight-cooperative-tensor-type,
+                              bias-cooperative-tensor-type,
+                              strides-vector-type ->
+                              result-cooperative-tensor-type
+    ```
+    For example:
+
+    ```
+    %0 = spv.CooperativeTensorConv2DVSI %input, %weight, %bias, %strides  :
+      !spv.cooptensor<i32, 8, 16>
+    ```
+  }];
+
+  let assemblyFormat = [{
+    operands attr-dict`:` type($input) `,` type($weight) `,` type($bias) `,` type($strides) `->` type($result)
+  }];
+
+  let availability = [
+    MinVersion<SPV_V_1_0>,
+    MaxVersion<SPV_V_1_5>,
+    Extension<[SPV_VSI_cooperative_tensor]>,
+    Capability<[SPV_C_CooperativeTensorVSI]>
+  ];
+
+  let arguments = (ins
+    SPV_AnyCooperativeTensor:$input,
+    SPV_AnyCooperativeTensor:$weight,
+    SPV_AnyCooperativeTensor:$bias,
+    SPV_Vector:$strides
+  );
+
+  let results = (outs
+    SPV_AnyCooperativeTensor:$result
+  );
+
+  let verifier = [{ return verifyCoopTensorConv2D(*this); }];
 }
 
 // -----

@@ -3932,8 +3932,9 @@ static LogicalResult verify(spirv::PtrAccessChainOp accessChainOp) {
 static ParseResult parseCooperativeTensorLoadVSIOp(OpAsmParser &parser,
                                                   OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 4> operandInfo;
+  SmallVector<int64_t, 1> stridesLen = {4};
   Type offsetType = parser.getBuilder().getIntegerType(32);
-  Type strideType = parser.getBuilder().getIntegerType(32);
+  Type strideType = VectorType::get(stridesLen, parser.getBuilder().getIntegerType(32));
   Type hwcLayoutType = parser.getBuilder().getIntegerType(1);
   Type ptrType;
   Type elementType;
@@ -3953,7 +3954,7 @@ static ParseResult parseCooperativeTensorLoadVSIOp(OpAsmParser &parser,
 }
 
 static void print(spirv::CooperativeTensorLoadVSIOp M, OpAsmPrinter &printer) {
-  printer << " " << M.pointer() << ", " << M.offset() << ", " << M.stride()
+  printer << " " << M.pointer() << ", " << M.offset() << ", " << M.strides()
           << ", " << M.hwclayout();
   // Print optional memory access attribute.
   if (auto memAccess = M.memory_access())
@@ -3987,8 +3988,9 @@ static LogicalResult verifyPointerAndCoopTensorType(Operation *op, Type pointer,
 static ParseResult parseCooperativeTensorStoreVSIOp(OpAsmParser &parser,
                                                    OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 5> operandInfo;
+  SmallVector<int64_t, 1> stridesLen = {4};
   Type offsetType = parser.getBuilder().getIntegerType(32);
-  Type strideType = parser.getBuilder().getIntegerType(32);
+  Type strideType = VectorType::get(stridesLen, parser.getBuilder().getIntegerType(32));
   Type hwcLayoutType = parser.getBuilder().getIntegerType(1);
   Type ptrType;
   Type elementType;
@@ -4010,7 +4012,7 @@ static ParseResult parseCooperativeTensorStoreVSIOp(OpAsmParser &parser,
 static void print(spirv::CooperativeTensorStoreVSIOp M,
                   OpAsmPrinter &printer) {
   printer << " " << M.pointer() << ", " << M.object() << ", "
-          << M.offset() << ", " << M.stride() << ", " << M.hwclayout();
+          << M.offset() << ", " << M.strides() << ", " << M.hwclayout();
   // Print optional memory access attribute.
   if (auto memAccess = M.memory_access())
     printer << " [\"" << stringifyMemoryAccess(*memAccess) << "\"]";
@@ -4037,6 +4039,26 @@ verifyCoopTensorMatMulAdd(spirv::CooperativeTensorMatMulAddVSIOp op) {
   if (typeA.getElementType() != typeB.getElementType() ||
       typeR.getElementType() != typeC.getElementType())
     return op.emitOpError("matrix element type must match");
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// spv.CooperativeTensorConv2DVSI
+//===----------------------------------------------------------------------===//
+
+static LogicalResult
+verifyCoopTensorConv2D(spirv::CooperativeTensorConv2DVSIOp op) {
+  auto typeInput = op.input().getType().cast<spirv::CooperativeTensorVSIType>();
+  auto typeWeight = op.weight().getType().cast<spirv::CooperativeTensorVSIType>();
+  //auto typeBias = op.bias().getType().cast<spirv::CooperativeTensorVSIType>();
+  //auto typeStrides = op.strides().getType().cast<VectorType>();
+  //auto typeR = op.result().getType().cast<spirv::CooperativeTensorVSIType>();
+  //if (typeA.getRows() != typeR.getRows() ||
+  //    typeA.getColumns() != typeB.getRows() ||
+  //    typeB.getColumns() != typeR.getColumns())
+  //  return op.emitOpError("matrix size must match");
+  if (typeInput.getElementType() != typeWeight.getElementType())
+    return op.emitOpError("Input and weight element type must match");
   return success();
 }
 
