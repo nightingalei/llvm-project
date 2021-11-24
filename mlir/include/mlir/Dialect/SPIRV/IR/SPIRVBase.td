@@ -282,13 +282,14 @@ def SPV_V_Intel       : StrEnumAttrCase<"Intel">;
 def SPV_V_NVIDIA      : StrEnumAttrCase<"NVIDIA">;
 def SPV_V_Qualcomm    : StrEnumAttrCase<"Qualcomm">;
 def SPV_V_SwiftShader : StrEnumAttrCase<"SwiftShader">;
+def SPV_V_VSI         : StrEnumAttrCase<"Verisilicon">;
 def SPV_V_Unknown     : StrEnumAttrCase<"Unknown">;
 
 def SPV_VendorAttr : SPV_StrEnumAttr<
   "Vendor", "recognized SPIR-V vendor strings", [
     SPV_V_AMD, SPV_V_ARM, SPV_V_Imagination, SPV_V_Intel,
     SPV_V_NVIDIA, SPV_V_Qualcomm, SPV_V_SwiftShader,
-    SPV_V_Unknown
+    SPV_V_VSI, SPV_V_Unknown
   ]>;
 
 //===----------------------------------------------------------------------===//
