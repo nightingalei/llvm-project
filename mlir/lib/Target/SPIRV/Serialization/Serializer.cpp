@@ -590,6 +590,25 @@ LogicalResult Serializer::prepareBasicType(
     return success();
   }
 
+  if (auto cooperativeTensorType =
+          type.dyn_cast<spirv::CooperativeTensorVSIType>()) {
+    uint32_t elementTypeID = 0;
+    if (failed(processTypeImpl(loc, cooperativeTensorType.getElementType(),
+                               elementTypeID, serializationCtx))) {
+      return failure();
+    }
+    typeEnum = spirv::Opcode::OpTypeCooperativeTensorVSI;
+    auto getConstantOp = [&](uint32_t id) {
+      auto attr = IntegerAttr::get(IntegerType::get(type.getContext(), 32), id);
+      return prepareConstantInt(loc, attr);
+    };
+    operands.push_back(elementTypeID);
+    for (auto dim : cooperativeTensorType.getShape()) {
+      operands.push_back(getConstantOp(dim));
+    }
+    return success();
+  }
+
   if (auto matrixType = type.dyn_cast<spirv::MatrixType>()) {
     uint32_t elementTypeID = 0;
     if (failed(processTypeImpl(loc, matrixType.getColumnType(), elementTypeID,

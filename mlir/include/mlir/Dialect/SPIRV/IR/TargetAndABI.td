@@ -55,6 +55,22 @@ def SPV_CooperativeMatrixPropertiesNVArrayAttr :
     TypedArrayAttrBase<SPV_CooperativeMatrixPropertiesNVAttr,
                        "CooperativeMatrixPropertiesNV array attribute">;
 
+// Description of cooperative matrix operations supported on the
+// target. Represents `VkCooperativeConv2DPropertiesVSI`.
+def SPV_CooperativeConv2DPropertiesVSIAttr :
+    StructAttr<"CooperativeConv2DPropertiesVSIAttr", SPIRV_Dialect, [
+    StructFieldAttr<"max_kernel_size", I32Attr>,
+    StructFieldAttr<"max_filter_size", I32Attr>,
+    StructFieldAttr<"input_type", TypeAttr>,
+    StructFieldAttr<"weight_type", TypeAttr>,
+    StructFieldAttr<"bias_type", TypeAttr>,
+    StructFieldAttr<"result_type", TypeAttr>
+]>;
+
+def SPV_CooperativeConv2DPropertiesVSIArrayAttr :
+    TypedArrayAttrBase<SPV_CooperativeConv2DPropertiesVSIAttr,
+                       "CooperativeConv2DPropertiesVSI array attribute">;
+
 // This attribute specifies the limits for various resources on the target
 // architecture.
 //
@@ -85,7 +101,13 @@ def SPV_ResourceLimitsAttr : StructAttr<"ResourceLimitsAttr", SPIRV_Dialect, [
     // supported. Default is an empty list.
     StructFieldAttr<
         "cooperative_matrix_properties_nv",
-        DefaultValuedAttr<SPV_CooperativeMatrixPropertiesNVArrayAttr, "{}">>
+        DefaultValuedAttr<SPV_CooperativeMatrixPropertiesNVArrayAttr, "{}">>,
+
+    // The configurations of cooperative conv2d
+    // supported. Default is an empty list.
+    StructFieldAttr<
+        "cooperative_conv2d_properties_vsi",
+        DefaultValuedAttr<SPV_CooperativeConv2DPropertiesVSIArrayAttr, "{}">>
 ]>;
 
 #endif // MLIR_DIALECT_SPIRV_IR_TARGET_AND_ABI

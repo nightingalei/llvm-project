@@ -157,7 +157,8 @@ spirv::getDefaultResourceLimits(MLIRContext *context) {
       /*max_compute_workgroup_invocations=*/nullptr,
       /*max_compute_workgroup_size=*/nullptr,
       /*subgroup_size=*/nullptr,
-      /*cooperative_matrix_properties_nv=*/nullptr, context);
+      /*cooperative_matrix_properties_nv=*/nullptr,
+      /*cooperative_conv2d_properties_vsi=*/nullptr, context);
 }
 
 StringRef spirv::getTargetEnvAttrName() { return "spv.target_env"; }
