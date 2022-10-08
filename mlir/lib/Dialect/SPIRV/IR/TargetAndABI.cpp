@@ -161,7 +161,9 @@ spirv::getDefaultResourceLimits(MLIRContext *context) {
       /*max_compute_workgroup_invocations=*/128,
       /*max_compute_workgroup_size=*/b.getI32ArrayAttr({128, 128, 64}),
       /*subgroup_size=*/32,
-      /*cooperative_matrix_properties_nv=*/ArrayAttr());
+      /*cooperative_matrix_properties_nv=*/ArrayAttr(),
+      /*cooperative_tensor_properties_nv=*/ArrayAttr()
+      );
 }
 
 StringRef spirv::getTargetEnvAttrName() { return "spirv.target_env"; }

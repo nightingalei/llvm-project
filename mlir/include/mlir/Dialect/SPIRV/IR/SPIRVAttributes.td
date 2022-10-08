@@ -60,10 +60,6 @@ def SPIRV_CooperativeMatrixPropertiesNVAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 }
 
-def SPIRV_CooperativeMatrixPropertiesNVArrayAttr :
-    TypedArrayAttrBase<SPIRV_CooperativeMatrixPropertiesNVAttr,
-                       "CooperativeMatrixPropertiesNV array attribute">;
-
 // Description of the supported joint matrix operations. See
 // https://github.com/intel/llvm/blob/sycl/sycl/doc/design/spirv-extensions/SPV_INTEL_joint_matrix.asciidoc
 def SPIRV_JointMatrixPropertiesINTELAttr :
@@ -84,6 +80,21 @@ def SPIRV_JointMatrixPropertiesINTELAttr :
 def SPIRV_JointMatrixPropertiesINTELArrayAttr :
     TypedArrayAttrBase<SPIRV_JointMatrixPropertiesINTELAttr,
                        "JointMatrixPropertiesINTEL array attribute">;
+
+// Description of cooperative matrix operations supported on the
+// target. Represents `VkCooperativeConv2DPropertiesVSI`.
+def SPIRV_CooperativeConv2DPropertiesVSIAttr :
+    SPIRV_Attr<"CooperativeConv2DPropertiesVSIAttr", "coop_tensor_props"> {
+  let parameters = (ins
+    "int":$max_kernel_size,
+    "int":$max_filter_size,
+    "mlir::Type":$input_type,
+    "mlir::Type":$weight_type,
+    "mlir::Type":$bias_type,
+    "mlir::Type":$result_type
+  );
+  let assemblyFormat = "`<` struct(params) `>`";
+}
 
 // This attribute specifies the limits for various resources on the target
 // architecture.
@@ -116,7 +127,14 @@ def SPIRV_ResourceLimitsAttr : SPIRV_Attr<"ResourceLimits", "resource_limits"> {
     DefaultValuedParameter<
       "ArrayAttr",
       "nullptr"
-    >:$cooperative_matrix_properties_nv
+    >:$cooperative_matrix_properties_nv,
+
+    // The configurations of cooperative conv2d
+    // supported. Default is an empty list.
+    DefaultValuedParameter<
+      "ArrayAttr",
+      "nullptr"
+    >:$cooperative_matrix_properties_vsi
   );
   let assemblyFormat = "`<` struct(params) `>`";
 }

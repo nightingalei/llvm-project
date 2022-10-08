@@ -283,13 +283,14 @@ def SPIRV_V_Intel       : I32EnumAttrCase<"Intel", 4>;
 def SPIRV_V_NVIDIA      : I32EnumAttrCase<"NVIDIA", 5>;
 def SPIRV_V_Qualcomm    : I32EnumAttrCase<"Qualcomm", 6>;
 def SPIRV_V_SwiftShader : I32EnumAttrCase<"SwiftShader", 7>;
+def SPIRV_V_VSI         : I32EnumAttrCase<"Verisilicon", 8>;
 def SPIRV_V_Unknown     : I32EnumAttrCase<"Unknown", 0xff>;
 
 def SPIRV_VendorAttr : SPIRV_I32EnumAttr<
   "Vendor", "recognized SPIR-V vendor strings", "vendor", [
     SPIRV_V_AMD, SPIRV_V_Apple, SPIRV_V_ARM, SPIRV_V_Imagination,
     SPIRV_V_Intel, SPIRV_V_NVIDIA, SPIRV_V_Qualcomm, SPIRV_V_SwiftShader,
-    SPIRV_V_Unknown
+    SPIRV_V_VSI, SPIRV_V_Unknown
   ]>;
 
 //===----------------------------------------------------------------------===//
@@ -401,6 +402,7 @@ def SPV_NV_stereo_view_rendering         : I32EnumAttrCase<"SPV_NV_stereo_view_r
 def SPV_NV_viewport_array2               : I32EnumAttrCase<"SPV_NV_viewport_array2", 5012>;
 def SPV_NV_bindless_texture              : I32EnumAttrCase<"SPV_NV_bindless_texture", 5013>;
 def SPV_NV_ray_tracing_motion_blur       : I32EnumAttrCase<"SPV_NV_ray_tracing_motion_blur", 5014>;
+def SPV_VSI_cooperative_tensor           : I32EnumAttrCase<"SPV_VSI_cooperative_tensor", 6000>;
 
 def SPV_NVX_multiview_per_view_attributes : I32EnumAttrCase<"SPV_NVX_multiview_per_view_attributes", 5015>;
 
@@ -448,7 +450,8 @@ def SPIRV_ExtensionAttr :
       SPV_NV_shader_image_footprint, SPV_NV_shader_sm_builtins,
       SPV_NV_shader_subgroup_partitioned, SPV_NV_shading_rate,
       SPV_NV_stereo_view_rendering, SPV_NV_viewport_array2, SPV_NV_bindless_texture,
-      SPV_NV_ray_tracing_motion_blur, SPV_NVX_multiview_per_view_attributes
+      SPV_NV_ray_tracing_motion_blur, SPV_NVX_multiview_per_view_attributes,
+      SPV_VSI_cooperative_tensor,
     ]>;
 
 //===----------------------------------------------------------------------===//
@@ -1394,6 +1397,13 @@ def SPIRV_C_JointMatrixINTEL                         : I32EnumAttrCase<"JointMat
   ];
 }
 
+def SPIRV_C_CooperativeTensorVSI                      : I32EnumAttrCase<"CooperativeTensorVSI", 6115> {
+  list<I32EnumAttrCase> implies = [SPIRV_C_Shader];
+  list<Availability> availability = [
+    Extension<[SPV_VSI_cooperative_tensor]>
+  ];
+}
+
 def SPIRV_CapabilityAttr :
     SPIRV_I32EnumAttr<"Capability", "valid SPIR-V Capability", "capability", [
       SPIRV_C_Matrix, SPIRV_C_Addresses, SPIRV_C_Linkage, SPIRV_C_Kernel, SPIRV_C_Float16,
@@ -1466,7 +1476,7 @@ def SPIRV_CapabilityAttr :
       SPIRV_C_ShaderNonUniform, SPIRV_C_RuntimeDescriptorArray,
       SPIRV_C_StorageTexelBufferArrayDynamicIndexing, SPIRV_C_RayTracingNV,
       SPIRV_C_RayTracingMotionBlurNV, SPIRV_C_PhysicalStorageBufferAddresses,
-      SPIRV_C_RayTracingProvisionalKHR, SPIRV_C_CooperativeMatrixNV,
+      SPIRV_C_RayTracingProvisionalKHR, SPIRV_C_CooperativeMatrixNV, SPIRV_C_CooperativeTensorVSI,
       SPIRV_C_FragmentShaderSampleInterlockEXT,
       SPIRV_C_FragmentShaderShadingRateInterlockEXT, SPIRV_C_ShaderSMBuiltinsNV,
       SPIRV_C_FragmentShaderPixelInterlockEXT, SPIRV_C_DemoteToHelperInvocation,
@@ -4035,6 +4045,8 @@ def SPIRV_IsRTArrayType : CPred<"$_self.isa<::mlir::spirv::RuntimeArrayType>()">
 def SPIRV_IsSampledImageType : CPred<"$_self.isa<::mlir::spirv::SampledImageType>()">;
 def SPIRV_IsStructType : CPred<"$_self.isa<::mlir::spirv::StructType>()">;
 
+def SPIRV_IsCooperativeTensorType :
+  CPred<"$_self.isa<::mlir::spirv::CooperativeTensorVSIType>()">;
 
 // See https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.html#_types
 // for the definition of the following types and type categories.
@@ -4070,17 +4082,20 @@ def SPIRV_AnyStruct : DialectType<SPIRV_Dialect, SPIRV_IsStructType,
 def SPIRV_AnySampledImage : DialectType<SPIRV_Dialect, SPIRV_IsSampledImageType,
                                 "any SPIR-V sampled image type">;
 
+def SPIRV_AnyCooperativeTensor : DialectType<SPIRV_Dialect,
+                               SPIRV_IsCooperativeTensorType,
+                               "any SPIR-V cooperative tensor type">;
 def SPIRV_Numerical : AnyTypeOf<[SPIRV_Integer, SPIRV_Float]>;
 def SPIRV_Scalar : AnyTypeOf<[SPIRV_Numerical, SPIRV_Bool]>;
 def SPIRV_Aggregate : AnyTypeOf<[SPIRV_AnyArray, SPIRV_AnyRTArray, SPIRV_AnyStruct]>;
 def SPIRV_Composite :
     AnyTypeOf<[SPIRV_Vector, SPIRV_AnyArray, SPIRV_AnyRTArray, SPIRV_AnyStruct,
-               SPIRV_AnyCooperativeMatrix, SPIRV_AnyJointMatrix, SPIRV_AnyMatrix]>;
+               SPIRV_AnyCooperativeMatrix, SPIRV_AnyCooperativeTensor, SPIRV_AnyJointMatrix, SPIRV_AnyMatrix]>;
 def SPIRV_Type : AnyTypeOf<[
     SPIRV_Void, SPIRV_Bool, SPIRV_Integer, SPIRV_Float, SPIRV_Vector,
     SPIRV_AnyPtr, SPIRV_AnyArray, SPIRV_AnyRTArray, SPIRV_AnyStruct,
     SPIRV_AnyCooperativeMatrix, SPIRV_AnyJointMatrix, SPIRV_AnyMatrix,
-    SPIRV_AnySampledImage
+    SPIRV_AnySampledImage, SPIRV_AnyCooperativeTensor
   ]>;
 
 def SPIRV_SignedInt : SignedIntOfWidths<[8, 16, 32, 64]>;
@@ -4096,12 +4111,17 @@ class SPIRV_JointMatrixOfType<list<Type> allowedTypes> :
     "$_self.cast<::mlir::spirv::JointMatrixINTELType>().getElementType()",
     "Joint Matrix">;
 
+class SPIRV_CoopTensorOfType<list<Type> allowedTypes> :
+  ContainerType<AnyTypeOf<allowedTypes>, SPIRV_IsCooperativeTensorType,
+    "$_self.cast<::mlir::spirv::CooperativeTensorVSIType>().getElementType()",
+    "Cooperative Tensor">;
+
 class SPIRV_ScalarOrVectorOf<Type type> :
     AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>]>;
 
-class SPIRV_ScalarOrVectorOrCoopMatrixOf<Type type> :
+class SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<Type type> :
     AnyTypeOf<[type, VectorOfLengthAndType<[2, 3, 4, 8, 16], [type]>,
-               SPIRV_CoopMatrixOfType<[type]>]>;
+               SPIRV_CoopMatrixOfType<[type]>, SPIRV_CoopTensorOfType<[type]>]>;
 
 def SPIRV_ScalarOrVector : AnyTypeOf<[SPIRV_Scalar, SPIRV_Vector]>;
 def SPIRV_ScalarOrVectorOrPtr : AnyTypeOf<[SPIRV_ScalarOrVector, SPIRV_AnyPtr]>;
@@ -4349,6 +4369,15 @@ def SPIRV_OC_OpJointMatrixStoreINTEL      : I32EnumAttrCase<"OpJointMatrixStoreI
 def SPIRV_OC_OpJointMatrixMadINTEL        : I32EnumAttrCase<"OpJointMatrixMadINTEL", 6122>;
 def SPIRV_OC_OpTypejointMatrixWorkItemLengthINTEL : I32EnumAttrCase<"OpJointMatrixWorkItemLengthINTEL", 6410>;
 
+def SPIRV_OC_OpTypeCooperativeTensorVSI      : I32EnumAttrCase<"OpTypeCooperativeTensorVSI", 6093>;
+def SPIRV_OC_OpCooperativeTensorLoadVSI      : I32EnumAttrCase<"OpCooperativeTensorLoadVSI", 6094>;
+def SPIRV_OC_OpCooperativeTensorStoreVSI     : I32EnumAttrCase<"OpCooperativeTensorStoreVSI", 6095>;
+def SPIRV_OC_OpCooperativeTensorMatMulAddVSI : I32EnumAttrCase<"OpCooperativeTensorMatMulAddVSI", 6096>;
+def SPIRV_OC_OpCooperativeTensorLengthVSI    : I32EnumAttrCase<"OpCooperativeTensorLengthVSI", 6097>;
+def SPIRV_OC_OpCooperativeTensorConv2DVSI    : I32EnumAttrCase<"OpCooperativeTensorConv2DVSI", 6098>;
+def SPIRV_OC_OpCooperativeTensorTransposeVSI : I32EnumAttrCase<"OpCooperativeTensorTransposeVSI", 6099>;
+def SPIRV_OC_OpCooperativeTensorMaxPool2DVSI : I32EnumAttrCase<"OpCooperativeTensorMaxPool2DVSI", 6100>;
+
 def SPIRV_OpcodeAttr :
     SPIRV_I32EnumAttr<"Opcode", "valid SPIR-V instructions", "opcode", [
       SPIRV_OC_OpNop, SPIRV_OC_OpUndef, SPIRV_OC_OpSourceContinued, SPIRV_OC_OpSource,
@@ -4420,7 +4449,12 @@ def SPIRV_OpcodeAttr :
 
       SPIRV_OC_OpTypeJointMatrixINTEL, SPIRV_OC_OpJointMatrixLoadINTEL,
       SPIRV_OC_OpJointMatrixStoreINTEL, SPIRV_OC_OpJointMatrixMadINTEL,
-      SPIRV_OC_OpTypejointMatrixWorkItemLengthINTEL
+      SPIRV_OC_OpTypejointMatrixWorkItemLengthINTEL,
+
+      SPIRV_OC_OpTypeCooperativeTensorVSI, SPIRV_OC_OpCooperativeTensorLoadVSI,
+      SPIRV_OC_OpCooperativeTensorStoreVSI, SPIRV_OC_OpCooperativeTensorLengthVSI,
+      SPIRV_OC_OpCooperativeTensorMatMulAddVSI, SPIRV_OC_OpCooperativeTensorConv2DVSI,
+      SPIRV_OC_OpCooperativeTensorTransposeVSI, SPIRV_OC_OpCooperativeTensorMaxPool2DVSI
     ]>;
 
 // End opcode section. Generated from SPIR-V spec; DO NOT MODIFY!
@@ -4564,6 +4598,10 @@ class SPIRV_IntelVendorOp<string mnemonic, list<Trait> traits = []> :
 
 class SPIRV_NvVendorOp<string mnemonic, list<Trait> traits = []> :
   SPIRV_VendorOp<mnemonic, "NV", traits> {
+}
+
+class SPIRV_VsiVendorOp<string mnemonic, list<Trait> traits = []> :
+  SPIRV_VendorOp<mnemonic, "VSI", traits> {
 }
 
 #endif // MLIR_DIALECT_SPIRV_IR_BASE

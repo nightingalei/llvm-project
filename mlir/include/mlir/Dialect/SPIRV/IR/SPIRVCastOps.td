@@ -23,11 +23,11 @@ class SPIRV_CastOp<string mnemonic, Type resultType, Type operandType,
              !listconcat(traits,
                          [NoSideEffect, SameOperandsAndResultShape])> {
   let arguments = (ins
-    SPIRV_ScalarOrVectorOrCoopMatrixOf<operandType>:$operand
+    SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<operandType>:$operand
   );
 
   let results = (outs
-    SPIRV_ScalarOrVectorOrCoopMatrixOf<resultType>:$result
+    SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<resultType>:$result
   );
   let assemblyFormat = [{
     $operand attr-dict `:` type($operand) `to` type($result)

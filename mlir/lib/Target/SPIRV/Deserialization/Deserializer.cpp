@@ -743,6 +743,8 @@ LogicalResult spirv::Deserializer::processType(spirv::Opcode opcode,
     return processStructType(operands);
   case spirv::Opcode::OpTypeMatrix:
     return processMatrixType(operands);
+  case spirv::Opcode::OpTypeCooperativeTensorVSI:
+    return processCooperativeTensorType(operands);
   default:
     return emitError(unknownLoc, "unhandled type instruction");
   }
@@ -922,6 +924,30 @@ spirv::Deserializer::processJointMatrixType(ArrayRef<uint32_t> operands) {
 
   typeMap[operands[0]] = spirv::JointMatrixINTELType::get(
       elementTy, scope.value(), rows, columns, matrixLayout.value());
+  return success();
+}
+
+LogicalResult
+spirv::Deserializer::processCooperativeTensorType(ArrayRef<uint32_t> operands) {
+  if (operands.size() < 3) {
+    return emitError(unknownLoc, "OpTypeCooperativeTensor must have element "
+                                 "type and shape parameters");
+  }
+
+  Type elementTy = getType(operands[1]);
+  if (!elementTy) {
+    return emitError(unknownLoc,
+                     "OpTypeCooperativeTensor references undefined <id> ")
+           << operands[1];
+  }
+
+  SmallVector<int64_t, 0> shape;
+  for (auto dim : operands.slice(2)) {
+    shape.push_back(getConstantInt(dim).getInt());
+  }
+
+  typeMap[operands[0]] = spirv::CooperativeTensorVSIType::get(
+      elementTy, shape);
   return success();
 }
 

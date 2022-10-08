@@ -27,12 +27,12 @@ class SPIRV_ArithmeticBinaryOp<string mnemonic, Type type,
   // In addition to normal types arithmetic instructions can support cooperative
   // matrix.
   let arguments = (ins
-    SPIRV_ScalarOrVectorOrCoopMatrixOf<type>:$operand1,
-    SPIRV_ScalarOrVectorOrCoopMatrixOf<type>:$operand2
+    SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<type>:$operand1,
+    SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<type>:$operand2
   );
 
   let results = (outs
-    SPIRV_ScalarOrVectorOrCoopMatrixOf<type>:$result
+    SPIRV_ScalarOrVectorOrCoopMatrixOrCoopTensorOf<type>:$result
   );
   let assemblyFormat = "operands attr-dict `:` type($result)";
 }
